@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 2.8...3.13)
 project(youbot_dynamics)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++17)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -72,6 +72,7 @@ add_dependencies(youbot_solver_test
 target_link_libraries(youbot_solver_test
   ${catkin_LIBRARIES}
   # ${PROJECT_NAME}
+  yaml-cpp
 )
 
 add_executable(youbot_rne_solver_test src/youbot_rne_solver_test.cpp)
@@ -82,6 +83,7 @@ add_dependencies(youbot_rne_solver_test
 target_link_libraries(youbot_rne_solver_test
   ${catkin_LIBRARIES}
   # ${PROJECT_NAME}
+  yaml-cpp
 )
 
 ## Rename C++ executable without prefix
@@ -132,3 +134,6 @@ install(TARGETS youbot_solver_test youbot_rne_solver_test
 # )
 
 
+install(DIRECTORY urdf/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/urdf
+)

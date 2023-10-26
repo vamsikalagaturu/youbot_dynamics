@@ -1,0 +1,5 @@
+youbot_urdf_path: 
+  abs_path: null
+  rel_path:
+    package_name: "youbot_dynamics"
+    path: "urdf/youbot_model.urdf"

@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include "kdl/jntarray.hpp"
 #include "kdl_parser/kdl_parser.hpp"
@@ -18,12 +19,52 @@
 #include "youbot_driver/youbot/EthercatMasterWithThread.hpp"
 #include "youbot_driver/youbot/YouBotManipulator.hpp"
 
-#include "ros/ros.h"
+#include "yaml-cpp/yaml.h"
+#include <ros/package.h>
+
 
 int main(int argc, char** argv)
 {
 
-  std::string robot_urdf = "urdf/youbot_model.urdf";
+  // load the configuration file
+  YAML::Node config = YAML::LoadFile(ros::package::getPath("youbot_dynamics") + "/config/params.yaml");
+
+  // check youbot_urdf_path/rel_path is set
+  if (!config["youbot_urdf_path"])
+  {
+    std::cout << "youbot_urdf_path not set in config file" << std::endl;
+    return -1;
+  }
+
+  std::string robot_urdf_path;
+
+  // check youbot_urdf_path/rel_path is set or null
+  if (!config["youbot_urdf_path"]["rel_path"]["package_name"] || !config["youbot_urdf_path"]["rel_path"]["path"] || config["youbot_urdf_path"]["rel_path"].IsNull())
+  {
+    if (!config["youbot_urdf_path"]["abs_path"] || config["youbot_urdf_path"]["abs_path"].IsNull())
+    {
+      std::cout << "youbot_urdf_path/rel_path or youbot_urdf_path/abs_path not set in config file" << std::endl;
+      return -1;
+    }
+    else
+    {
+      robot_urdf_path = config["youbot_urdf_path"]["abs_path"].as<std::string>();
+    }
+  }
+  else
+  {
+    std::string package_name = config["youbot_urdf_path"]["rel_path"]["package_name"].as<std::string>();
+    robot_urdf_path = ros::package::getPath(package_name) + "/" + config["youbot_urdf_path"]["rel_path"]["path"].as<std::string>();
+  }
+
+  std::cout << "youbot_urdf_path: " << robot_urdf_path << std::endl;
+
+  // check if robot_urdf_path exists
+  if (!std::filesystem::exists(robot_urdf_path))
+  {
+    std::cout << "youbot_urdf_path does not exist" << std::endl;
+    return -1;
+  }
 
   // set the base and tool links
   std::string base_link = "arm_link_0";
@@ -33,7 +74,7 @@ int main(int argc, char** argv)
   KDL::Chain robot_chain;
 
   // load the robot URDF into the KDL tree
-  if (!kdl_parser::treeFromFile(robot_urdf, robot_tree))
+  if (!kdl_parser::treeFromFile(robot_urdf_path, robot_tree))
   {
     return -1;
   }
@@ -53,10 +94,10 @@ int main(int argc, char** argv)
   std::cout << "Number of joints: " << n_joints << std::endl;
   std::cout << "Number of segments: " << n_segments << std::endl;
 
-  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", "/home/batsy/bitbots/src/youbot_driver/config/", true);
+  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", ros::package::getPath("youbot_driver") + "/config/", true);
 
   // initialize youbot arm
-  youbot::YouBotManipulator myArm("youbot-manipulator");
+  youbot::YouBotManipulator myArm("youbot-manipulator", ros::package::getPath("youbot_driver") + "/config/");
   myArm.doJointCommutation();
   std::cout << "Calibrating the arm!" << std::endl;
   myArm.calibrateManipulator();
@@ -138,7 +179,7 @@ int main(int argc, char** argv)
 
     myArm.setJointData(commandTorques);
     
-    usleep(10000);
+    usleep(100);
   }
   
   return 0;
