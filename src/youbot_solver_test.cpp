@@ -23,7 +23,7 @@
 #include "youbot_driver/youbot/YouBotManipulator.hpp"
 
 #include "yaml-cpp/yaml.h"
-#include <ros/package.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 enum class CoordinateSystem
 {
@@ -133,39 +133,11 @@ transform(KDL::JntArray& source_jnt_array,
   }
 }
 
-KDL::Twist pidController(const KDL::Twist& current_twist, const KDL::Twist& target_twist, double dt, KDL::Twist& error_sum, KDL::Twist& error_last)
-{
-  double kp = 5.0;
-  double ki = 0.0;
-  double kd = 0.05;
-
-  // compute error
-  KDL::Twist error_twist = target_twist - current_twist;
-
-  // proportional term
-  KDL::Twist p_term = kp * error_twist;
-
-  // integral term
-  error_sum += error_twist * dt;
-  KDL::Twist i_term = ki * error_sum;
-
-  // derivative term
-  KDL::Twist d_term = kd * (error_twist - error_last) / dt;
-
-  // compute control
-  KDL::Twist control = p_term + i_term + d_term;
-
-  // update error_last
-  error_last = error_twist;
-
-  return control;
-}
-
 int main(int argc, char** argv)
 {
 
   // load the configuration file
-  YAML::Node config = YAML::LoadFile(ros::package::getPath("youbot_dynamics") + "/config/params.yaml");
+  YAML::Node config = YAML::LoadFile(ament_index_cpp::get_package_share_directory("youbot_dynamics") + "/config/params.yaml");
 
   // check youbot_urdf_path/rel_path is set
   if (!config["youbot_urdf_path"])
@@ -192,7 +164,7 @@ int main(int argc, char** argv)
   else
   {
     std::string package_name = config["youbot_urdf_path"]["rel_path"]["package_name"].as<std::string>();
-    robot_urdf_path = ros::package::getPath(package_name) + "/" + config["youbot_urdf_path"]["rel_path"]["path"].as<std::string>();
+    robot_urdf_path = ament_index_cpp::get_package_share_directory(package_name) + "/" + config["youbot_urdf_path"]["rel_path"]["path"].as<std::string>();
   }
 
   std::cout << "youbot_urdf_path: " << robot_urdf_path << std::endl;
@@ -222,7 +194,7 @@ int main(int argc, char** argv)
   }
 
   // set joint inertias
-  robot_chain.getSegment(0).setJoint().setJointInertia(0.338489424);
+  robot_chain.getSegment(0).setJoint().setJointInertia(0.538489424);
   robot_chain.getSegment(1).setJoint().setJointInertia(0.338489424);
   robot_chain.getSegment(2).setJoint().setJointInertia(0.13571);
   robot_chain.getSegment(3).setJoint().setJointInertia(0.04698212);
@@ -237,10 +209,10 @@ int main(int argc, char** argv)
   std::cout << "Number of joints: " << n_joints << std::endl;
   std::cout << "Number of segments: " << n_segments << std::endl;
 
-  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", ros::package::getPath("youbot_driver") + "/config/", true);
+  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", ament_index_cpp::get_package_share_directory("youbot_driver") + "/config/", true);
 
   // initialize youbot arm
-  youbot::YouBotManipulator myArm("youbot-manipulator", ros::package::getPath("youbot_driver") + "/config/");
+  youbot::YouBotManipulator myArm("youbot-manipulator", ament_index_cpp::get_package_share_directory("youbot_driver") + "/config/");
   myArm.doJointCommutation();
   std::cout << "Calibrating the arm!" << std::endl;
   myArm.calibrateManipulator();
@@ -297,15 +269,8 @@ int main(int argc, char** argv)
   q_offsets(3) = KDL::deg2rad * 102.5;
   q_offsets(4) = KDL::deg2rad * 165.0;
 
-  // pid controller terms
-  // KDL::Twist error_sum(KDL::Vector(0.0, 0.0, 0.0), KDL::Vector(0.0, 0.0, 0.0));
-  // KDL::Twist error_last(KDL::Vector(0.0, 0.0, 0.0), KDL::Vector(0.0, 0.0, 0.0));
-
-  // system time step
-  // double dt = 0.001;
-
   while (true) {
-
+    std::vector<youbot::JointSensedAngle> joint_angles;
     myArm.getJointData(joint_angles);
 
     for (int i = 0; i < n_joints; i++) {
@@ -344,9 +309,9 @@ int main(int argc, char** argv)
     beta_energy_base(2) = 9.81;
 
     // set the beta energy for EE
-    beta_energy_ee(3) = 0.0;
-    beta_energy_ee(4) = 0.0;
-    beta_energy_ee(5) = 0.0;
+    beta_energy_ee(0) = 0.0;
+    beta_energy_ee(1) = 0.0;
+    beta_energy_ee(2) = 0.0;
 
     // transform alpha_unit_forces to BASE
     transform(alpha_unit_forces_ee,
@@ -370,9 +335,9 @@ int main(int argc, char** argv)
     beta_energy(0) = beta_energy_base(0);
     beta_energy(1) = beta_energy_base(1);
     beta_energy(2) = beta_energy_base(2);
-    beta_energy(3) = beta_energy_ee(3);
-    beta_energy(4) = beta_energy_ee(4);
-    beta_energy(5) = beta_energy_ee(5);
+    beta_energy(3) = beta_energy_ee(0);
+    beta_energy(4) = beta_energy_ee(1);
+    beta_energy(5) = beta_energy_ee(2);
 
     vereshchagin_solver.CartToJnt(
       q, qdot, qdotdot, alpha_unit_forces, beta_energy, f_ext, ff_tau, torques);
@@ -389,7 +354,7 @@ int main(int argc, char** argv)
 
     std::vector<youbot::JointTorqueSetpoint> commandTorques;
     youbot::JointTorqueSetpoint desiredJointTorque;
-    desiredJointTorque.torque = 0.0 * si::newton_meters;
+    desiredJointTorque.torque = torques(0) * si::newton_meters;
     commandTorques.push_back(desiredJointTorque);
     desiredJointTorque.torque = torques(1) * si::newton_meters;
     commandTorques.push_back(desiredJointTorque);
@@ -397,11 +362,8 @@ int main(int argc, char** argv)
     commandTorques.push_back(desiredJointTorque);
     desiredJointTorque.torque = torques(3) * si::newton_meters;
     commandTorques.push_back(desiredJointTorque);
-    desiredJointTorque.torque = 0.0 * si::newton_meters;
+    desiredJointTorque.torque = torques(4) * si::newton_meters;
     commandTorques.push_back(desiredJointTorque);
-
-    // std::vector<KDL::Twist> link_accs(n_segments);
-    // vereshchagin_solver.getTransformedLinkAcceleration(link_accs);
 
     // std::cout << "joint q: " << q << std::endl;
     // std::cout << "joint qdot: " << qdot << std::endl;
@@ -411,6 +373,7 @@ int main(int argc, char** argv)
     std::cout << "joint torques: " << torques << std::endl;
 
     myArm.setJointData(commandTorques);
+
     usleep(100);
   }
 

@@ -20,14 +20,19 @@
 #include "youbot_driver/youbot/YouBotManipulator.hpp"
 
 #include "yaml-cpp/yaml.h"
-#include <ros/package.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 
 int main(int argc, char** argv)
 {
 
+  std::string package_share_directory = ament_index_cpp::get_package_share_directory("youbot_dynamics");
+
+
+  std::cout << "package_share_directory: " << package_share_directory << std::endl;
+
   // load the configuration file
-  YAML::Node config = YAML::LoadFile(ros::package::getPath("youbot_dynamics") + "/config/params.yaml");
+  YAML::Node config = YAML::LoadFile(package_share_directory + "/config/params.yaml");
 
   // check youbot_urdf_path/rel_path is set
   if (!config["youbot_urdf_path"])
@@ -54,7 +59,7 @@ int main(int argc, char** argv)
   else
   {
     std::string package_name = config["youbot_urdf_path"]["rel_path"]["package_name"].as<std::string>();
-    robot_urdf_path = ros::package::getPath(package_name) + "/" + config["youbot_urdf_path"]["rel_path"]["path"].as<std::string>();
+    robot_urdf_path = ament_index_cpp::get_package_share_directory(package_name) + "/" + config["youbot_urdf_path"]["rel_path"]["path"].as<std::string>();
   }
 
   std::cout << "youbot_urdf_path: " << robot_urdf_path << std::endl;
@@ -94,10 +99,10 @@ int main(int argc, char** argv)
   std::cout << "Number of joints: " << n_joints << std::endl;
   std::cout << "Number of segments: " << n_segments << std::endl;
 
-  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", ros::package::getPath("youbot_driver") + "/config/", true);
+  youbot::EthercatMaster::getInstance("youbot-ethercat.cfg", ament_index_cpp::get_package_share_directory("youbot_driver") + "/config/", true);
 
   // initialize youbot arm
-  youbot::YouBotManipulator myArm("youbot-manipulator", ros::package::getPath("youbot_driver") + "/config/");
+  youbot::YouBotManipulator myArm("youbot-manipulator", ament_index_cpp::get_package_share_directory("youbot_driver") + "/config/");
   myArm.doJointCommutation();
   std::cout << "Calibrating the arm!" << std::endl;
   myArm.calibrateManipulator();
